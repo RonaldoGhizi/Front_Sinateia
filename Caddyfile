@@ -1,0 +1,28 @@
+# Site do Sinatéia. SINATEIA_DOMINIO é o domínio público (o Caddy pede o certificado HTTPS
+# sozinho) ou "localhost" para testar no computador. A API fica no mesmo endereço, em /api:
+# assim o cookie de login é do próprio site e a API não precisa liberar CORS.
+{$SINATEIA_DOMINIO:localhost} {
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy {$SINATEIA_API:api:8000}
+	}
+
+	handle {
+		root * /srv
+		# As rotas do React (/relatorio/..., /perfis) são todas o index.html.
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	@arquivos path /assets/*
+	header @arquivos Cache-Control "public, max-age=31536000, immutable"
+}
