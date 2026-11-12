@@ -14,6 +14,10 @@ const DESCRICAO: Record<string, { nome: string; uso: string; unidade: string; co
   conitec_recomendacoes: { nome: "Conitec", uso: "Decisões de incorporação ao SUS", unidade: "recomendações", comando: "carregar conitec ARQUIVO" },
   pcdt_cid: { nome: "PCDT", uso: "Medicamentos de cada CID nos protocolos do SUS", unidade: "linhas", comando: "carregar pcdt ARQUIVO" },
   catmat: { nome: "BNAFAR · CATMAT", uso: "Códigos para consultar o estoque das farmácias do SUS", unidade: "códigos", comando: "bnafar codigos" },
+  anvisa_dcb: { nome: "Anvisa · DCB", uso: "Nome brasileiro e nº CAS de cada princípio ativo", unidade: "substâncias", comando: "carregar dcb" },
+  orphanet: { nome: "Orphanet", uso: "Doenças raras com o CID-10 (CC BY 4.0)", unidade: "doenças", comando: "carregar orphanet" },
+  wikidata_indicacoes: { nome: "Wikidata", uso: "Remédios usados para cada doença (CC0)", unidade: "indicações", comando: "carregar wikidata" },
+  chembl_indicacoes: { nome: "ChEMBL", uso: "Indicações aprovadas e em estudo clínico (CC BY-SA 3.0)", unidade: "indicações", comando: "carregar chembl" },
 };
 
 const ESPERADAS = Object.keys(DESCRICAO);

@@ -193,6 +193,9 @@ tr:last-child td { border-bottom: 0; }
 .cid-item .mono { font-weight: 500; color: var(--marca-escura); }
 .destaque-cid { font-size: 14px; font-weight: 500; color: var(--marca); }
 .medicamento-sus header { display: flex; flex-direction: column; gap: 4px; }
+.etiquetas { display: flex; flex-wrap: wrap; gap: 6px; }
+.fontes-abertas { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.fontes-abertas > .cartao:first-child { border-left: 4px solid var(--alerta); }
 .lista-codigos { display: flex; flex-wrap: wrap; gap: 6px; }
 .codigo { font-family: "IBM Plex Mono", monospace; font-size: 13px; padding: 0 8px; border-radius: 6px; background: var(--suave); }
 .codigo.ativo { background: var(--marca); color: #fff; }

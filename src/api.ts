@@ -79,6 +79,8 @@ export interface Apresentacao {
 export interface Cid {
   codigo: string;
   nome: string | null;
+  /** Nome da doença (Orphanet ou Wikidata) pelo qual o CID foi achado na busca. */
+  encontrado_como?: string | null;
 }
 
 export interface ProcedimentoSus {
@@ -102,6 +104,34 @@ export interface MedicamentoSus {
 
 export interface CidDetalhe extends Cid {
   medicamentos_sus: MedicamentoSus[];
+  observacoes: string[];
+}
+
+export interface EvidenciaAberta {
+  origem: "wikidata" | "chembl";
+  doenca: string;
+  /** Fase clínica no ChEMBL: 4 = aprovado por alguma agência; 3 e 2 = estudos. */
+  fase: Decimal | null;
+  referencia: string | null;
+}
+
+export interface MedicamentoAberto {
+  substancia: string;
+  nome_internacional: string;
+  dcb: string | null;
+  cas: string | null;
+  atc: string | null;
+  mesmo_cid: boolean;
+  maior_fase: Decimal | null;
+  evidencias: EvidenciaAberta[];
+  registros_anvisa: Registro[];
+  total_registros_anvisa: number;
+}
+
+export interface CidFontesAbertas {
+  codigo: string;
+  medicamentos: MedicamentoAberto[];
+  total: number;
   observacoes: string[];
 }
 
@@ -350,6 +380,8 @@ export const api = {
   buscarCids: (q: string, sinal?: AbortSignal) => obter<Cid[]>("/cids", { q, limite: 20 }, sinal),
   obterCid: (codigo: string, sinal?: AbortSignal) =>
     obter<CidDetalhe>(`/cids/${encodeURIComponent(codigo)}`, { limite_registros: 10 }, sinal),
+  obterCidFontesAbertas: (codigo: string, sinal?: AbortSignal) =>
+    obter<CidFontesAbertas>(`/cids/${encodeURIComponent(codigo)}/fontes-abertas`, { limite: 40, limite_registros: 10 }, sinal),
 
   // Conta
   sessao: (sinal?: AbortSignal) => obter<Conta | null>("/auth/sessao", {}, sinal),

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, type MedicamentoSus, type Registro } from "../api";
+import { api, type CidFontesAbertas, type MedicamentoAberto, type MedicamentoSus, type Registro } from "../api";
 import { Aviso, Carregando, Etiqueta } from "../componentes/Etiqueta";
 import { componente, faixaDeIdade, frase, nomeDaUf, percentual, reais, registroAnvisa, UFS } from "../formato";
 import { enderecoDoRelatorio } from "../recentes";
-import { useCarregar } from "../useCarregar";
+import { type Carga, useCarregar } from "../useCarregar";
 
 export function Cids() {
   const { codigo } = useParams();
@@ -16,6 +16,7 @@ export function Cids() {
 
   const resultados = useCarregar(busca.length >= 2 ? (sinal) => api.buscarCids(busca, sinal) : null, [busca]);
   const detalhe = useCarregar(codigo ? (sinal) => api.obterCid(codigo, sinal) : null, [codigo]);
+  const abertas = useCarregar(codigo ? (sinal) => api.obterCidFontesAbertas(codigo, sinal) : null, [codigo]);
 
   function pesquisar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -37,7 +38,10 @@ export function Cids() {
     <>
       <header className="cabecalho">
         <h1>Medicamentos por doença (CID)</h1>
-        <p>Digite o código ou o nome da doença. O Sinatéia mostra o que o SUS fornece para ela e o preço máximo de cada medicamento.</p>
+        <p>
+          Digite o código ou o nome da doença. O Sinatéia mostra o que o SUS fornece para ela, outros remédios citados em bases internacionais e o preço
+          máximo de cada medicamento.
+        </p>
       </header>
 
       <div className="duas-colunas">
@@ -68,6 +72,7 @@ export function Cids() {
                     >
                       <span className="mono">{c.codigo}</span>
                       <span>{c.nome}</span>
+                      {c.encontrado_como && <span className="nota">Achado como “{c.encontrado_como}”</span>}
                     </Link>
                   </li>
                 ))}
@@ -125,10 +130,8 @@ export function Cids() {
                     {o}
                   </p>
                 ))}
-                <p className="secundario">
-                  Em breve: medicamentos com registro na Anvisa para esta doença que o SUS não fornece, com a decisão da Conitec.
-                </p>
               </div>
+              <FontesAbertas carga={abertas} cid={detalhe.dados.codigo} uf={uf} />
             </>
           )}
         </section>
@@ -233,4 +236,109 @@ function Registros({ registros, total, cid, uf }: { registros: Registro[]; total
       </ul>
     </details>
   );
+}
+
+function FontesAbertas({ carga, cid, uf }: { carga: Carga<CidFontesAbertas> | null; cid: string; uf: string }) {
+  if (!carga || carga.estado === "carregando") return <Carregando texto="Buscando remédios em bases internacionais…" />;
+  if (carga.estado === "erro") return <Aviso tom="alerta">{carga.mensagem}</Aviso>;
+  const { medicamentos, total, observacoes } = carga.dados;
+  return (
+    <section className="fontes-abertas" aria-labelledby="titulo-fontes-abertas">
+      <div className="cartao">
+        <h2 id="titulo-fontes-abertas">Uso descrito em fontes internacionais</h2>
+        <p className="secundario">
+          {medicamentos.length === 0
+            ? "Nenhum outro remédio para este CID nas bases abertas (Wikidata e ChEMBL)."
+            : `${total} ${total === 1 ? "remédio" : "remédios"} fora da lista do SUS para este CID${total > medicamentos.length ? `; mostrando ${medicamentos.length}` : ""}.`}
+        </p>
+        {observacoes.map((o) => (
+          <p key={o} className="nota">
+            {o}
+          </p>
+        ))}
+      </div>
+      {medicamentos.map((m) => (
+        <CartaoMedicamentoAberto key={`${m.substancia}-${m.nome_internacional}`} medicamento={m} cid={cid} uf={uf} />
+      ))}
+    </section>
+  );
+}
+
+function rotuloDaFase(fase: string | null): { texto: string; tom: "ok" | "info" | "neutro" } {
+  if (fase === null) return { texto: "Citado no Wikidata", tom: "neutro" };
+  const numero = Number(fase);
+  if (numero >= 4) return { texto: "Aprovado para a doença (FDA, EMA ou outra agência)", tom: "ok" };
+  return { texto: `Em estudo clínico, fase ${Math.floor(numero)}`, tom: "info" };
+}
+
+function CartaoMedicamentoAberto({ medicamento, cid, uf }: { medicamento: MedicamentoAberto; cid: string; uf: string }) {
+  const principal = medicamento.registros_anvisa.find((r) => r.valido) ?? null;
+  const fase = rotuloDaFase(medicamento.maior_fase);
+  const doencas = [...new Set(medicamento.evidencias.map((e) => e.doenca))];
+  const fontes = [...new Map(medicamento.evidencias.map((e) => [e.origem, e])).values()];
+  return (
+    <article className="cartao medicamento-sus">
+      <header>
+        <h3>{frase(medicamento.substancia)}</h3>
+        <p className="secundario">
+          {medicamento.dcb && normalizado(medicamento.dcb) !== normalizado(medicamento.nome_internacional) && `${medicamento.nome_internacional} · `}
+          {principal
+            ? `${principal.nome_produto} · ${principal.empresa ?? ""}`
+            : medicamento.dcb
+              ? "Sem registro válido na Anvisa: só por importação (Tema 500)"
+              : "Sem nome brasileiro (DCB) na lista da Anvisa: provavelmente sem registro no Brasil"}
+        </p>
+        <div className="etiquetas">
+          <Etiqueta tom={fase.tom}>{fase.texto}</Etiqueta>
+          {!medicamento.mesmo_cid && <Etiqueta tom="alerta">Outro CID do grupo {cid.slice(0, 3)}</Etiqueta>}
+        </div>
+      </header>
+      <dl className="dados">
+        <div>
+          <dt>Doença na fonte</dt>
+          {doencas.slice(0, 3).map((d) => (
+            <dd key={d}>{d}</dd>
+          ))}
+        </div>
+        <div>
+          <dt>Fontes</dt>
+          {fontes.map((e) => (
+            <dd key={e.origem}>
+              {e.referencia ? (
+                <a href={e.referencia} target="_blank" rel="noreferrer">
+                  {e.origem === "chembl" ? "ChEMBL" : "Wikidata"}
+                </a>
+              ) : e.origem === "chembl" ? (
+                "ChEMBL"
+              ) : (
+                "Wikidata"
+              )}
+            </dd>
+          ))}
+        </div>
+        {medicamento.atc && (
+          <div>
+            <dt>Código ATC</dt>
+            <dd className="lista-codigos">
+              {medicamento.atc.split("|").map((c) => (
+                <span key={c} className="codigo">
+                  {c}
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
+        <div>
+          <dt>Registros na Anvisa</dt>
+          <dd>{medicamento.dcb ? `${medicamento.total_registros_anvisa} ${medicamento.total_registros_anvisa === 1 ? "registro" : "registros"}` : "Não procurado (sem DCB)"}</dd>
+        </div>
+      </dl>
+      {principal && uf && <TetoDoRegistro registro={principal} uf={uf} />}
+      <Registros registros={medicamento.registros_anvisa} total={medicamento.total_registros_anvisa} cid={cid} uf={uf} />
+    </article>
+  );
+}
+
+function normalizado(texto: string): string {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
